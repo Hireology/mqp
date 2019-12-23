@@ -58,33 +58,30 @@ func publishMessage(c *amqp.Channel, message string) amqp.Publishing {
 	routingKey := "myRoutingKey"
 	publishing := newBasicPublishing(message)
 
-	q, err := c.QueueDeclare(routingKey, false, true, true, true, nil)
-	failOnError("queue declare", err)
-	err = c.Publish(exchange, q.Name, true, false, *publishing)
+	err := c.Publish(exchange, routingKey, true, false, *publishing)
 	// TODO where does this prefix come from?
 	failOnError("basic.publish", err)
-	defer c.Close()
+	//defer c.Close()
 	return *publishing
 }
 
-// consume a message
-func consumeMessage(c *amqp.Channel, queue, consumer string) amqp.Delivery {
-	//func (ch *Channel) Consume(queue, consumer string, autoAck, exclusive, noLocal, noWait bool, args Table) (<-chan Delivery, error)
-	deliver, err := c.Consume(queue, consumer, false, false, false, false, nil)
+func messages(c *amqp.Channel, queue, consumer string) <-chan amqp.Delivery {
+	deliver, err := c.Consume(
+		queue,
+		consumer,
+		true,  // autoAck
+		false, // exclusive
+		false, // noLocal
+		false, // noWait
+		nil,   // args
+	)
+	//c.Close()
 	failOnError("channel.consume", err)
-	// what should this actually return?
-	// what do we get from <-chan amqp.Deliver ?
-	for {
-		msg, ok := <-deliver
-		if ok == false {
-			log.Println("channel closed")
-			break
-		}
-		log.Println("received:", msg, ok)
-		err := msg.Ack(true)
-		failOnError("delivery.ack", err)
-	}
+	return deliver
+}
 
-	stuff := amqp.Delivery{}
-	return stuff
+func processMessages(messages <-chan amqp.Delivery) {
+	for d := range messages {
+		log.Println("received:", string(d.Body))
+	}
 }

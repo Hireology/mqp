@@ -46,6 +46,9 @@ func TestPublishMessage(t *testing.T) {
 	conn := connect(connectionString)
 	channel, err := conn.Channel()
 	failOnError("channel.open", err)
+	rk := "myRoutingKey"
+	_, err = channel.QueueDeclare(rk, false, true, true, true, nil)
+	failOnError("queue.declare", err)
 	publishMessage(channel, "hello world")
 
 	// got should be the last message in whatever test queue we used
@@ -66,11 +69,15 @@ func TestConsumeMessage(t *testing.T) {
 	conn := connect(connectionString)
 	channel, err := conn.Channel()
 	failOnError("channel.open", err)
+	rk := "myRoutingKey"
+	_, err = channel.QueueDeclare(rk, false, true, true, true, nil)
+	failOnError("queue.declare", err)
 	publishMessage(channel, "ping")
 
 	// then consume
 	// FIXME the channel never seems to close
-	consumeMessage(channel, "myRoutingKey", "myConsumer")
+	messages := messages(channel, rk, "myConsumer")
+	processMessages(messages)
 
 	got := "foo"
 	want := "bar"

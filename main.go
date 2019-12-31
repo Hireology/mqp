@@ -75,7 +75,6 @@ func messages(c *amqp.Channel, queue, consumer string) <-chan amqp.Delivery {
 		false, // noWait
 		nil,   // args
 	)
-	//c.Close()
 	failOnError("channel.consume", err)
 	return deliver
 }

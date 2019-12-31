@@ -3,95 +3,91 @@ package main
 import (
 	"fmt"
 	//"log"
+	"github.com/streadway/amqp"
+	"github.com/stretchr/testify/assert"
+	//"os"
 	"testing"
 )
 
 // test BEHAVIOR not implementation
-
-/*
-func TestMain(t *testing.T) {
-    got := "foo"
-    want := "bar"
-    if got != want {
-        t.Errorf("got %s; want %s", got, want)
-    }
-}
-*/
-
-func TestConnect(t *testing.T) {
+func setup() (conn *amqp.Connection) {
 	connectionString := fmt.Sprintf("%s://%s:%s@%s:%d/%s",
 		scheme, user, password, host, port, vhost)
-	conn := connect(connectionString)
-	got := fmt.Sprintf("%s", conn.Config.Vhost)
-	//got := fmt.Sprintf("%+v", conn)
-	want := vhost
-	if got != want {
-		t.Errorf("got %s; want %s", got, want)
-	}
+	conn = connect(connectionString)
+	return conn
+}
+
+func TestConnect(t *testing.T) {
+	/*
+		cases:
+		- known good
+		- known bad
+	*/
+	conn := setup()
+	assert.Equal(t, conn.Config.Vhost, vhost)
 	defer conn.Close()
 }
 
 func TestNewBasicPublishing(t *testing.T) {
+	/*
+	   cases:
+	   - basic alphanumeric/special chars string
+	   - unicode string
+	   - emoji string
+	*/
 	pub := newBasicPublishing("hello world")
-	got := string(pub.Body[:])
-	want := "hello world"
-	if got != want {
-		t.Errorf("got %s; want %s", got, want)
-	}
+	assert.Equal(t, string(pub.Body), "hello world")
 }
 
 func TestPublishMessage(t *testing.T) {
-	connectionString := fmt.Sprintf("%s://%s:%s@%s:%d/%s",
-		scheme, user, password, host, port, vhost)
-	conn := connect(connectionString)
+	/*
+	   cases:
+	   - basic known good single message
+	   - multiple messages
+	*/
+	conn := setup()
 	channel, err := conn.Channel()
-	failOnError("channel.open", err)
-	rk := "myRoutingKey"
-	_, err = channel.QueueDeclare(rk, false, true, true, true, nil)
-	failOnError("queue.declare", err)
+	assert.Nil(t, err)
+	routingKey := "myRoutingKey"
+	_, err = channel.QueueDeclare(
+		routingKey, false, true, true, true, nil)
+	assert.Nil(t, err)
 	publishMessage(channel, "hello world")
 
 	// got should be the last message in whatever test queue we used
-	msg, _, err := channel.Get("myRoutingKey", false)
-	failOnError("channel.get", err)
-	got := string(msg.Body[:])
-	want := "hello world"
-	if got != want {
-		t.Errorf("got %s; want %s", got, want)
-	}
+	msg, _, err := channel.Get(routingKey, false)
+	assert.Nil(t, err)
+	assert.Equal(t, string(msg.Body), "hello world")
 	defer conn.Close()
 }
 
-func TestConsumeMessage(t *testing.T) {
-	// publish a message
-	connectionString := fmt.Sprintf("%s://%s:%s@%s:%d/%s",
-		scheme, user, password, host, port, vhost)
-	conn := connect(connectionString)
+func TestProcessMessages(t *testing.T) {
+	/*
+	   cases:
+	   - one message
+	   - no messages
+	   - 5 messages
+	*/
+	conn := setup()
 	channel, err := conn.Channel()
-	failOnError("channel.open", err)
-	rk := "myRoutingKey"
-	_, err = channel.QueueDeclare(rk, false, true, true, true, nil)
-	failOnError("queue.declare", err)
+	assert.Nil(t, err)
+
+	routingKey := "myRoutingKey"
+	_, err = channel.QueueDeclare(
+		routingKey, false, true, true, true, nil)
+	assert.Nil(t, err)
+
 	publishMessage(channel, "ping")
 
-	// then consume
-	// FIXME the channel never seems to close
-	messages := messages(channel, rk, "myConsumer")
+	messages := messages(channel, routingKey, "myConsumer")
 	processMessages(messages)
-
-	got := "foo"
-	want := "bar"
-	if got != want {
-		t.Errorf("got %s; want %s", got, want)
-	}
 }
 
 /*
 func TestConnectTLS(t *testing.T) {
+	//got := fmt.Sprintf("%+v", conn)
     got := "foo"
     want := "bar"
-    if got != want {
-        t.Errorf("got %s; want %s", got, want)
-    }
+	assert.Equal(t, got, want)
 }
 */

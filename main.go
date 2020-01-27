@@ -121,6 +121,7 @@ func messages(c *amqp.Channel, queue, consumer string) <-chan amqp.Delivery {
 	return deliver
 }
 
+// tell processMessages about how many messages it should get?
 func processMessages(messages <-chan amqp.Delivery) {
 	for d := range messages {
 		log.Println("received:", string(d.Body))

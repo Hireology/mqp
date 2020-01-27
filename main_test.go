@@ -4,6 +4,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
+	"time"
 )
 
 type MQPTestSuite struct {
@@ -13,7 +14,9 @@ type MQPTestSuite struct {
 
 func (suite *MQPTestSuite) SetupSuite() {
 	uri := parseFlags()
-	suite.mq, _ = NewMQ(uri)
+	var err error
+	suite.mq, err = NewMQ(uri)
+	assert.Nil(suite.T(), err)
 }
 
 func TestMQPTestSuite(t *testing.T) {
@@ -23,8 +26,9 @@ func TestMQPTestSuite(t *testing.T) {
 func (suite *MQPTestSuite) TestConnect() {
 	/*
 		cases:
-		- known good
-		- known bad
+		- known good {credentials, vhost}
+		- known bad {credentials, vhost}
+		- rmq not running
 	*/
 	conn := suite.mq.Connection
 	assert.Equal(suite.T(), conn.Config.Vhost, "mqp")
@@ -62,8 +66,7 @@ func (suite *MQPTestSuite) TestPublishMessage() {
 	msg, _, err := channel.Get(routingKey, false)
 	assert.Nil(suite.T(), err)
 	assert.Equal(suite.T(), string(msg.Body), "hello world")
-	channel.Close()
-	//defer conn.Close()
+	defer conn.Close()
 }
 
 func (suite *MQPTestSuite) TestProcessMessages() {
@@ -86,6 +89,11 @@ func (suite *MQPTestSuite) TestProcessMessages() {
 	publishMessage(channel, "ping")
 
 	messages := messages(channel, routingKey, "myConsumer")
+	//goroutine but close after X seconds
+	go func() {
+		time.Sleep(3 * time.Second)
+		channel.Close()
+	}()
 	processMessages(messages)
 }
 

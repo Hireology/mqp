@@ -1,25 +1,11 @@
 package main
 
 import (
-	// packages
 	"flag"
-	//"fmt"
 	"github.com/streadway/amqp"
 	"log"
 	"time"
-	//"github.com/Hireology/go_shared/messaging"
 )
-
-/*
-var (
-	scheme   = "amqp"
-	user     = "mqp"
-	password = "mqptest"
-	host     = "127.0.0.1"
-	port     = 5672
-	vhost    = "mqp" // leading slash is not needed
-)
-*/
 
 const (
 	DefaultScheme   = "amqp"
@@ -72,7 +58,6 @@ func failOnError(prefix string, err error) {
 
 func (mq *MQ) connect() error {
 	conn, err := amqp.Dial(mq.URI.String())
-	//failOnError("connection failure", err)
 	mq.Connection = conn
 
 	return err
@@ -101,9 +86,7 @@ func publishMessage(c *amqp.Channel, message string) amqp.Publishing {
 	publishing := newBasicPublishing(message)
 
 	err := c.Publish(exchange, routingKey, true, false, *publishing)
-	// TODO where does this prefix come from?
 	failOnError("basic.publish", err)
-	//defer c.Close()
 	return *publishing
 }
 

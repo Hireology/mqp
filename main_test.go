@@ -1,34 +1,44 @@
 package main
 
 import (
-	"fmt"
-	//"log"
-	"github.com/streadway/amqp"
 	"github.com/stretchr/testify/assert"
-	//"os"
+	"github.com/stretchr/testify/suite"
 	"testing"
+	"time"
 )
 
-// test BEHAVIOR not implementation
-func setup() (conn *amqp.Connection) {
-	connectionString := fmt.Sprintf("%s://%s:%s@%s:%d/%s",
-		scheme, user, password, host, port, vhost)
-	conn = connect(connectionString)
-	return conn
+type MQPTestSuite struct {
+	suite.Suite
+	mq *MQ
 }
 
-func TestConnect(t *testing.T) {
+func (suite *MQPTestSuite) SetupSuite() {
+	uri := parseFlags()
+	var err error
+	suite.mq, err = NewMQ(uri)
+	assert.Nil(suite.T(), err)
+}
+
+func (suite *MQPTestSuite) TearDownSuite() {
+	suite.mq.Connection.Close()
+}
+
+func TestMQPTestSuite(t *testing.T) {
+	suite.Run(t, new(MQPTestSuite))
+}
+
+func (suite *MQPTestSuite) TestConnect() {
 	/*
 		cases:
-		- known good
-		- known bad
+		- known good {credentials, vhost}
+		- known bad {credentials, vhost}
+		- rmq not running
 	*/
-	conn := setup()
-	assert.Equal(t, conn.Config.Vhost, vhost)
-	defer conn.Close()
+	conn := suite.mq.Connection
+	assert.Equal(suite.T(), "mqp", conn.Config.Vhost)
 }
 
-func TestNewBasicPublishing(t *testing.T) {
+func (suite *MQPTestSuite) TestNewBasicPublishing() {
 	/*
 	   cases:
 	   - basic alphanumeric/special chars string
@@ -36,58 +46,68 @@ func TestNewBasicPublishing(t *testing.T) {
 	   - emoji string
 	*/
 	pub := newBasicPublishing("hello world")
-	assert.Equal(t, string(pub.Body), "hello world")
+	assert.Equal(suite.T(), "hello world", string(pub.Body))
 }
 
-func TestPublishMessage(t *testing.T) {
+func (suite *MQPTestSuite) TestPublishMessage() {
 	/*
 	   cases:
 	   - basic known good single message
 	   - multiple messages
 	*/
-	conn := setup()
+	conn := suite.mq.Connection
 	channel, err := conn.Channel()
-	assert.Nil(t, err)
+	assert.Nil(suite.T(), err)
 	routingKey := "myRoutingKey"
 	_, err = channel.QueueDeclare(
 		routingKey, false, true, true, true, nil)
-	assert.Nil(t, err)
+	assert.Nil(suite.T(), err)
 	publishMessage(channel, "hello world")
 
 	// got should be the last message in whatever test queue we used
 	msg, _, err := channel.Get(routingKey, false)
-	assert.Nil(t, err)
-	assert.Equal(t, string(msg.Body), "hello world")
-	defer conn.Close()
+	assert.Nil(suite.T(), err)
+	assert.Equal(suite.T(), "hello world", string(msg.Body))
 }
 
-func TestProcessMessages(t *testing.T) {
+func (suite *MQPTestSuite) TestProcessMessages() {
 	/*
 	   cases:
 	   - one message
 	   - no messages
 	   - 5 messages
 	*/
-	conn := setup()
+	conn := suite.mq.Connection
 	channel, err := conn.Channel()
-	assert.Nil(t, err)
+	assert.Nil(suite.T(), err)
 
 	routingKey := "myRoutingKey"
 	_, err = channel.QueueDeclare(
 		routingKey, false, true, true, true, nil)
-	assert.Nil(t, err)
+	assert.Nil(suite.T(), err)
 
 	publishMessage(channel, "ping")
 
 	messages := messages(channel, routingKey, "myConsumer")
+	//goroutine but close after X seconds
+	go func() {
+		time.Sleep(3 * time.Second)
+		channel.Close()
+	}()
 	processMessages(messages)
+}
+
+func (suite *MQPTestSuite) TestParseFlags() {
+	got := suite.mq.URI.String()
+	want := "amqp://mqp:mqptest@127.0.0.1/mqp"
+	assert.Equal(suite.T(), want, got)
 }
 
 /*
 func TestConnectTLS(t *testing.T) {
 	//got := fmt.Sprintf("%+v", conn)
-    got := "foo"
-    want := "bar"
+	got := "foo"
+	want := "bar"
 	assert.Equal(t, got, want)
 }
 */

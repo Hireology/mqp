@@ -31,7 +31,7 @@ func (suite *MQPTestSuite) TestConnect() {
 		- rmq not running
 	*/
 	conn := suite.mq.Connection
-	assert.Equal(suite.T(), conn.Config.Vhost, "mqp")
+	assert.Equal(suite.T(), "mqp", conn.Config.Vhost)
 	//defer conn.Close()
 }
 
@@ -43,7 +43,7 @@ func (suite *MQPTestSuite) TestNewBasicPublishing() {
 	   - emoji string
 	*/
 	pub := newBasicPublishing("hello world")
-	assert.Equal(suite.T(), string(pub.Body), "hello world")
+	assert.Equal(suite.T(), "hello world", string(pub.Body))
 }
 
 func (suite *MQPTestSuite) TestPublishMessage() {
@@ -65,7 +65,7 @@ func (suite *MQPTestSuite) TestPublishMessage() {
 	// got should be the last message in whatever test queue we used
 	msg, _, err := channel.Get(routingKey, false)
 	assert.Nil(suite.T(), err)
-	assert.Equal(suite.T(), string(msg.Body), "hello world")
+	assert.Equal(suite.T(), "hello world", string(msg.Body))
 	defer conn.Close()
 }
 
@@ -100,7 +100,7 @@ func (suite *MQPTestSuite) TestProcessMessages() {
 func (suite *MQPTestSuite) TestParseFlags() {
 	got := suite.mq.URI.String()
 	want := "amqp://mqp:mqptest@127.0.0.1/mqp"
-	assert.Equal(suite.T(), got, want)
+	assert.Equal(suite.T(), want, got)
 }
 
 /*

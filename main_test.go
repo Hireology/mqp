@@ -19,6 +19,10 @@ func (suite *MQPTestSuite) SetupSuite() {
 	assert.Nil(suite.T(), err)
 }
 
+func (suite *MQPTestSuite) TearDownSuite() {
+	suite.mq.Connection.Close()
+}
+
 func TestMQPTestSuite(t *testing.T) {
 	suite.Run(t, new(MQPTestSuite))
 }
@@ -32,7 +36,6 @@ func (suite *MQPTestSuite) TestConnect() {
 	*/
 	conn := suite.mq.Connection
 	assert.Equal(suite.T(), "mqp", conn.Config.Vhost)
-	//defer conn.Close()
 }
 
 func (suite *MQPTestSuite) TestNewBasicPublishing() {
@@ -52,7 +55,6 @@ func (suite *MQPTestSuite) TestPublishMessage() {
 	   - basic known good single message
 	   - multiple messages
 	*/
-	//conn := setup()
 	conn := suite.mq.Connection
 	channel, err := conn.Channel()
 	assert.Nil(suite.T(), err)
@@ -66,11 +68,9 @@ func (suite *MQPTestSuite) TestPublishMessage() {
 	msg, _, err := channel.Get(routingKey, false)
 	assert.Nil(suite.T(), err)
 	assert.Equal(suite.T(), "hello world", string(msg.Body))
-	defer conn.Close()
 }
 
 func (suite *MQPTestSuite) TestProcessMessages() {
-	//suite.T().Skip("pls fix me")
 	/*
 	   cases:
 	   - one message

@@ -4,7 +4,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"testing"
-	"time"
 )
 
 type MQPTestSuite struct {
@@ -55,12 +54,8 @@ func (suite *MQPTestSuite) TestPublishMessage() {
 	   - basic known good single message
 	   - multiple messages
 	*/
-	conn := suite.mq.Connection
-	channel, err := conn.Channel()
-	assert.Nil(suite.T(), err)
 	routingKey := "myRoutingKey"
-	_, err = channel.QueueDeclare(
-		routingKey, false, true, true, true, nil)
+	channel, err := suite.mq.setupChannel(routingKey)
 	assert.Nil(suite.T(), err)
 	publishMessage(channel, "hello world")
 
@@ -77,23 +72,15 @@ func (suite *MQPTestSuite) TestProcessMessages() {
 	   - no messages
 	   - 5 messages
 	*/
-	conn := suite.mq.Connection
-	channel, err := conn.Channel()
-	assert.Nil(suite.T(), err)
-
 	routingKey := "myRoutingKey"
-	_, err = channel.QueueDeclare(
-		routingKey, false, true, true, true, nil)
+	channel, err := suite.mq.setupChannel(routingKey)
 	assert.Nil(suite.T(), err)
 
 	publishMessage(channel, "ping")
 
 	messages := messages(channel, routingKey, "myConsumer")
 	//goroutine but close after X seconds
-	go func() {
-		time.Sleep(3 * time.Second)
-		channel.Close()
-	}()
+	go channelTimeout(channel, 1)
 	processMessages(messages)
 }
 
@@ -101,6 +88,11 @@ func (suite *MQPTestSuite) TestParseFlags() {
 	got := suite.mq.URI.String()
 	want := "amqp://mqp:mqptest@127.0.0.1/mqp"
 	assert.Equal(suite.T(), want, got)
+}
+
+func (suite *MQPTestSuite) TestMain() {
+	var err error
+	assert.Nil(suite.T(), err)
 }
 
 /*

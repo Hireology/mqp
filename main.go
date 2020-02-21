@@ -2,8 +2,10 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"github.com/streadway/amqp"
 	"log"
+	"os"
 	"time"
 )
 
@@ -25,6 +27,7 @@ type MQ struct {
 
 // NewMQ initializes RabbitMQ and returns a pointer to it
 func NewMQ(uri *amqp.URI) (*MQ, error) {
+	log.Printf("connecting to %s", uri)
 	mq := MQ{
 		URI: uri,
 	}
@@ -32,8 +35,61 @@ func NewMQ(uri *amqp.URI) (*MQ, error) {
 	return &mq, err
 }
 
+func (mq *MQ) setupChannel(routingKey string) (*amqp.Channel, error) {
+	conn := mq.Connection
+	channel, err := conn.Channel()
+
+	_, err = channel.QueueDeclare(
+		routingKey, false, true, true, true, nil)
+
+	return channel, err
+}
+
+func publishMessages(channel *amqp.Channel, msg string, expectedMessages int) {
+	for i := 1; i <= expectedMessages; i++ {
+		msg := fmt.Sprintf("%s: %d of %d", msg, i, expectedMessages)
+		publishMessage(channel, msg)
+		log.Printf("published: %s", msg)
+	}
+}
+
+func channelTimeout(channel *amqp.Channel, timeoutSeconds time.Duration) {
+	time.Sleep(timeoutSeconds * time.Second)
+	channel.Close()
+}
+
 func main() {
-	// stuff
+	// connection setup
+	expectedMessages := 5
+	routingKey := "myRoutingKey"
+	consumer := "myConsumer"
+	uri := parseFlags()
+
+	mq, err := NewMQ(uri)
+	// TODO handle error
+	failOnError("connection", err)
+
+	channel, err := mq.setupChannel(routingKey)
+	// TODO handle error
+	failOnError("channel setup", err)
+
+	publishMessages(channel, "hello world", expectedMessages)
+
+	go channelTimeout(channel, 1)
+	messages := messages(channel, routingKey, consumer)
+	processMessages(messages)
+
+	// TODO allow user to specify N
+	// TODO display statistics
+	/* exit codes
+	0 = all messages published and delivered successfully
+	1 = at least one message NACK'd
+	2 = any kind of failure (messages dropped, unaccounted for, connection failed, etc)
+	*/
+	mq.Connection.Close()
+
+	// exit with relevant error code
+	os.Exit(0)
 }
 
 func parseFlags() *amqp.URI {
@@ -86,6 +142,7 @@ func publishMessage(c *amqp.Channel, message string) amqp.Publishing {
 	publishing := newBasicPublishing(message)
 
 	err := c.Publish(exchange, routingKey, true, false, *publishing)
+	// TODO pass error up
 	failOnError("basic.publish", err)
 	return *publishing
 }

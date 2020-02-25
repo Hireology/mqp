@@ -27,7 +27,7 @@ type MQ struct {
 
 // NewMQ initializes RabbitMQ and returns a pointer to it
 func NewMQ(uri *amqp.URI) (*MQ, error) {
-	log.Printf("connecting to %s", uri)
+	log.Printf("connecting to %s:%d", uri.Host, uri.Port)
 	mq := MQ{
 		URI: uri,
 	}

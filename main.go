@@ -53,8 +53,8 @@ func publishMessages(channel *amqp.Channel, msg string, expectedMessages int) {
 	}
 }
 
-func channelTimeout(channel *amqp.Channel, timeoutSeconds time.Duration) {
-	time.Sleep(timeoutSeconds * time.Second)
+func channelTimeout(channel *amqp.Channel, timeoutSeconds int) {
+	time.Sleep(time.Duration(timeoutSeconds) * time.Second)
 	channel.Close()
 }
 

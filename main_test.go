@@ -49,11 +49,6 @@ func (suite *MQPTestSuite) TestNewBasicPublishing() {
 }
 
 func (suite *MQPTestSuite) TestPublishMessage() {
-	/*
-	   cases:
-	   - basic known good single message
-	   - multiple messages
-	*/
 	routingKey := "myRoutingKey"
 	channel, err := suite.mq.setupChannel(routingKey)
 	assert.Nil(suite.T(), err)
@@ -63,6 +58,18 @@ func (suite *MQPTestSuite) TestPublishMessage() {
 	msg, _, err := channel.Get(routingKey, false)
 	assert.Nil(suite.T(), err)
 	assert.Equal(suite.T(), "hello world", string(msg.Body))
+}
+
+func (suite *MQPTestSuite) TestPublishMessages() {
+	routingKey := "myRoutingKey"
+	channel, err := suite.mq.setupChannel(routingKey)
+	assert.Nil(suite.T(), err)
+	publishMessages(channel, "hello world", 5)
+
+	// got should be the last message in whatever test queue we used
+	msg, _, err := channel.Get(routingKey, false)
+	assert.Nil(suite.T(), err)
+	assert.Equal(suite.T(), "hello world: 1 of 5", string(msg.Body))
 }
 
 func (suite *MQPTestSuite) TestProcessMessages() {
@@ -88,11 +95,6 @@ func (suite *MQPTestSuite) TestParseFlags() {
 	got := suite.mq.URI.String()
 	want := "amqp://mqp:mqptest@127.0.0.1/mqp"
 	assert.Equal(suite.T(), want, got)
-}
-
-func (suite *MQPTestSuite) TestMain() {
-	var err error
-	assert.Nil(suite.T(), err)
 }
 
 /*

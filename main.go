@@ -25,8 +25,8 @@ type MQ struct {
 	Connection *amqp.Connection
 }
 
-// NewMQ initializes RabbitMQ and returns a pointer to it
-func NewMQ(uri *amqp.URI) (*MQ, error) {
+// newMQ initializes RabbitMQ and returns a pointer to it
+func newMQ(uri *amqp.URI) (*MQ, error) {
 	log.Printf("connecting to %s:%d", uri.Host, uri.Port)
 	mq := MQ{
 		URI: uri,
@@ -53,9 +53,13 @@ func publishMessages(channel *amqp.Channel, msg string, expectedMessages int) {
 	}
 }
 
-func channelTimeout(channel *amqp.Channel, timeoutSeconds int) {
+func channelTimeout(channel Closer, timeoutSeconds int) {
 	time.Sleep(time.Duration(timeoutSeconds) * time.Second)
 	channel.Close()
+}
+
+type Closer interface {
+	Close() error
 }
 
 func main() {
@@ -65,7 +69,7 @@ func main() {
 	consumer := "myConsumer"
 	uri := parseFlags()
 
-	mq, err := NewMQ(uri)
+	mq, err := newMQ(uri)
 	// TODO handle error
 	failOnError("connection", err)
 

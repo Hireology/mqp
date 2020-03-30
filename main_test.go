@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"testing"
 )
@@ -14,7 +15,7 @@ type MQPTestSuite struct {
 func (suite *MQPTestSuite) SetupSuite() {
 	uri := parseFlags()
 	var err error
-	suite.mq, err = NewMQ(uri)
+	suite.mq, err = newMQ(uri)
 	assert.Nil(suite.T(), err)
 }
 
@@ -70,6 +71,26 @@ func (suite *MQPTestSuite) TestPublishMessages() {
 	msg, _, err := channel.Get(routingKey, false)
 	assert.Nil(suite.T(), err)
 	assert.Equal(suite.T(), "hello world: 1 of 5", string(msg.Body))
+}
+
+type MockCloser struct {
+	mock.Mock
+}
+
+func (mc *MockCloser) Close() error {
+	args := mc.Called()
+	return args.Error(0)
+}
+
+func (suite *MQPTestSuite) TestChannelTimeout() {
+	mc := &MockCloser{}
+	mc.On("Close").Return(nil)
+	// test for correct error:
+	//mc.On("Close").Returns(errors.New("blah"))
+	//mc.Assert(suite.T(), err.Error, "blah")
+	channelTimeout(mc, 1)
+	// assert that at least the expected amount of time has passed
+	mc.AssertNumberOfCalls(suite.T(), "Close", 1)
 }
 
 func (suite *MQPTestSuite) TestProcessMessages() {

@@ -2,9 +2,9 @@ package main
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 	"testing"
-	"time"
 )
 
 type MQPTestSuite struct {
@@ -15,7 +15,7 @@ type MQPTestSuite struct {
 func (suite *MQPTestSuite) SetupSuite() {
 	uri := parseFlags()
 	var err error
-	suite.mq, err = NewMQ(uri)
+	suite.mq, err = newMQ(uri)
 	assert.Nil(suite.T(), err)
 }
 
@@ -50,17 +50,8 @@ func (suite *MQPTestSuite) TestNewBasicPublishing() {
 }
 
 func (suite *MQPTestSuite) TestPublishMessage() {
-	/*
-	   cases:
-	   - basic known good single message
-	   - multiple messages
-	*/
-	conn := suite.mq.Connection
-	channel, err := conn.Channel()
-	assert.Nil(suite.T(), err)
 	routingKey := "myRoutingKey"
-	_, err = channel.QueueDeclare(
-		routingKey, false, true, true, true, nil)
+	channel, err := suite.mq.setupChannel(routingKey)
 	assert.Nil(suite.T(), err)
 	publishMessage(channel, "hello world")
 
@@ -70,6 +61,38 @@ func (suite *MQPTestSuite) TestPublishMessage() {
 	assert.Equal(suite.T(), "hello world", string(msg.Body))
 }
 
+func (suite *MQPTestSuite) TestPublishMessages() {
+	routingKey := "myRoutingKey"
+	channel, err := suite.mq.setupChannel(routingKey)
+	assert.Nil(suite.T(), err)
+	publishMessages(channel, "hello world", 5)
+
+	// got should be the last message in whatever test queue we used
+	msg, _, err := channel.Get(routingKey, false)
+	assert.Nil(suite.T(), err)
+	assert.Equal(suite.T(), "hello world: 1 of 5", string(msg.Body))
+}
+
+type MockCloser struct {
+	mock.Mock
+}
+
+func (mc *MockCloser) Close() error {
+	args := mc.Called()
+	return args.Error(0)
+}
+
+func (suite *MQPTestSuite) TestChannelTimeout() {
+	mc := &MockCloser{}
+	mc.On("Close").Return(nil)
+	// test for correct error:
+	//mc.On("Close").Returns(errors.New("blah"))
+	//mc.Assert(suite.T(), err.Error, "blah")
+	channelTimeout(mc, 1)
+	// assert that at least the expected amount of time has passed
+	mc.AssertNumberOfCalls(suite.T(), "Close", 1)
+}
+
 func (suite *MQPTestSuite) TestProcessMessages() {
 	/*
 	   cases:
@@ -77,23 +100,15 @@ func (suite *MQPTestSuite) TestProcessMessages() {
 	   - no messages
 	   - 5 messages
 	*/
-	conn := suite.mq.Connection
-	channel, err := conn.Channel()
-	assert.Nil(suite.T(), err)
-
 	routingKey := "myRoutingKey"
-	_, err = channel.QueueDeclare(
-		routingKey, false, true, true, true, nil)
+	channel, err := suite.mq.setupChannel(routingKey)
 	assert.Nil(suite.T(), err)
 
 	publishMessage(channel, "ping")
 
 	messages := messages(channel, routingKey, "myConsumer")
 	//goroutine but close after X seconds
-	go func() {
-		time.Sleep(3 * time.Second)
-		channel.Close()
-	}()
+	go channelTimeout(channel, 1)
 	processMessages(messages)
 }
 
